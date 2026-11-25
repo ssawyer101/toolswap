@@ -4,3 +4,4 @@ app/.env
 app/*.tsbuildinfo
 app/next-env.d.ts
 toolswap-backup.zip
+railway-variables.txt
