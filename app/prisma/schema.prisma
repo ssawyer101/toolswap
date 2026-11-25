@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  area         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  sessions      Session[]
+  resets        PasswordReset[]
+  memberships   Membership[]
+  tools         Tool[]
+  basket        BasketItem[]
+  borrowed      Loan[]             @relation("borrower")
+  lent          Loan[]             @relation("lender")
+  messages      Message[]
+  notifications Notification[]
+  pushSubs      PushSubscription[]
+}
+
+model Session {
+  id        String   @id // sha256 of the cookie token
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String    @id // sha256 of the emailed token
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+}
+
+model Group {
+  id          String       @id @default(cuid())
+  name        String
+  inviteCode  String       @unique
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  shares      ToolShare[]
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+}
+
+model Membership {
+  id        String       @id @default(cuid())
+  userId    String
+  groupId   String
+  role      Role         @default(MEMBER)
+  status    MemberStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Tool {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  category    String
+  value       Int?
+  description String?
+  tip         String?
+  link        String?
+  video       String?
+  paused      Boolean  @default(false)
+  photo       Bytes?
+  photoType   String?
+  photoVer    Int      @default(0)
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  shares ToolShare[]
+  loans  Loan[]
+  basket BasketItem[]
+}
+
+model ToolShare {
+  toolId  String
+  groupId String
+  tool    Tool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([toolId, groupId])
+}
+
+model BasketItem {
+  userId  String
+  toolId  String
+  addedAt DateTime @default(now())
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool    Tool     @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@id([userId, toolId])
+}
+
+enum LoanStatus {
+  REQUESTED // borrower asked
+  APPROVED  // lender said yes, not picked up yet
+  OUT       // borrower has it
+  RETURNED  // borrower says it's back, lender hasn't confirmed
+  CLOSED    // lender confirmed it's back
+  DECLINED
+  CANCELLED
+}
+
+model Loan {
+  id          String     @id @default(cuid())
+  toolId      String
+  borrowerId  String
+  lenderId    String
+  status      LoanStatus @default(REQUESTED)
+  startDate   DateTime // stored at 12:00 UTC of the calendar day
+  dueDate     DateTime
+  needBy      DateTime?
+  note        String?
+  extendTo    DateTime? // pending request for more time
+  returnNote  String?
+  pickedUpAt  DateTime?
+  returnedAt  DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  tool      Tool          @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  borrower  User          @relation("borrower", fields: [borrowerId], references: [id], onDelete: Cascade)
+  lender    User          @relation("lender", fields: [lenderId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  reminders ReminderLog[]
+
+  @@index([toolId, status])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  loanId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  url       String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ReminderLog {
+  id     String @id @default(cuid())
+  loanId String
+  kind   String
+  day    String
+  loan   Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, kind, day])
+}

@@ -1,0 +1,393 @@
+<title>ToolSwap Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a workshop pegboard — sticky tab bar on top, one working column of tagged tool cards below */
+:root{
+  --bg:#EEF0EC; --surface:#FFFFFF; --ink:#1E2420; --muted:#5E6862; --line:#D5DAD4;
+  --accent:#C2410C; --accent-ink:#FFFFFF; --accent-soft:#FBE7DC;
+  --ok:#1F7A4D; --ok-soft:#DDF1E6; --warn:#A16207; --warn-soft:#FBF0D2; --bad:#B42318; --bad-soft:#FBE0DD;
+  --tag:#F5E9B8; --tag-ink:#3B3418;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151916; --surface:#1F2420; --ink:#E7EBE6; --muted:#9AA59E; --line:#343B36;
+  --accent:#F97339; --accent-ink:#1A0D05; --accent-soft:#3A2117;
+  --ok:#5BC48E; --ok-soft:#173126; --warn:#E0B44C; --warn-soft:#352B12; --bad:#F07A6E; --bad-soft:#3A1A17;
+  --tag:#4A4222; --tag-ink:#F2E7B6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151916; --surface:#1F2420; --ink:#E7EBE6; --muted:#9AA59E; --line:#343B36;
+  --accent:#F97339; --accent-ink:#1A0D05; --accent-soft:#3A2117;
+  --ok:#5BC48E; --ok-soft:#173126; --warn:#E0B44C; --warn-soft:#352B12; --bad:#F07A6E; --bad-soft:#3A1A17;
+  --tag:#4A4222; --tag-ink:#F2E7B6; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--ink)}
+.wrap{max-width:960px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--ink);color:var(--bg)}
+header.bar .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:10px}
+.brand{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase}
+.brand span{color:var(--accent)}
+nav.tabs{display:flex;flex-wrap:wrap;gap:4px}
+nav.tabs a{color:var(--bg);opacity:.75;text-decoration:none;font-weight:600;padding:6px 10px;border-radius:6px;font-size:14px;display:flex;gap:6px;align-items:center}
+nav.tabs a:hover{opacity:1}
+nav.tabs a.on{opacity:1;background:color-mix(in srgb,var(--bg) 16%,transparent)}
+nav.tabs .count{background:var(--accent);color:var(--accent-ink);border-radius:10px;font-size:12px;padding:0 7px;font-family:var(--mono)}
+.note{background:var(--tag);color:var(--tag-ink);font-size:13px;padding:8px 12px;border-radius:6px;margin-top:16px}
+main{padding-block:20px 60px}
+h1{font-family:var(--display);font-weight:700;font-size:34px;line-height:1.1;margin:0 0 4px;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+h2{font-family:var(--display);font-weight:700;font-size:22px;margin:28px 0 10px;text-transform:uppercase;letter-spacing:.02em}
+.lede{color:var(--muted);margin:0 0 18px;max-width:65ch}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=text],input[type=search],input[type=date],input[type=number],input[type=url],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+textarea{min-height:70px}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px;color:var(--muted)}
+button{font:inherit;font-weight:600;cursor:pointer;border-radius:6px;padding:7px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button:hover{border-color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.07)}
+button.small{padding:4px 10px;font-size:13px}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:10px}
+.tool{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
+.tool > div{min-width:0}
+.thumb{width:64px;height:64px;border-radius:6px;background:var(--bg);display:grid;place-items:center;font-family:var(--display);font-weight:700;color:var(--muted);font-size:20px;overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.tname{font-weight:600;font-size:16px}
+.meta{color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px}
+.tagno{font-family:var(--mono);font-size:11px;background:var(--tag);color:var(--tag-ink);padding:1px 6px;border-radius:3px}
+.tip{margin-top:8px;font-size:13px;background:var(--warn-soft);color:var(--ink);border-left:3px solid var(--warn);padding:6px 10px;border-radius:0 4px 4px 0}
+.tip b{color:var(--warn)}
+.links{display:flex;gap:12px;font-size:13px;margin-top:6px;flex-wrap:wrap}
+.links a{color:var(--accent);font-weight:600}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.p-ok{background:var(--ok-soft);color:var(--ok)} .p-warn{background:var(--warn-soft);color:var(--warn)}
+.p-bad{background:var(--bad-soft);color:var(--bad)} .p-neutral{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.p-accent{background:var(--accent-soft);color:var(--accent)}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+.money{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.lender{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.lender-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.lender-head .who{font-weight:600;font-size:17px}
+.meter{display:flex;gap:3px;margin-top:6px}
+.meter i{width:18px;height:6px;border-radius:2px;background:var(--line)}
+.meter i.f{background:var(--accent)}
+.li{display:flex;justify-content:space-between;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);align-items:center}
+.li:last-child{border-bottom:0}
+.li > div{min-width:0}
+.best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.empty{text-align:center;color:var(--muted);padding:40px 16px;border:1px dashed var(--line);border-radius:8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+.matrix{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+td.c,th.c{text-align:center}
+tr:last-child td{border-bottom:0}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.card-stamp{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.reminder{display:flex;gap:10px;font-size:14px;padding:8px 0;border-bottom:1px solid var(--line)}
+.reminder:last-child{border-bottom:0}
+.reminder .when{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:76px;padding-top:2px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.form .full{grid-column:1/-1}
+@media (max-width:560px){
+  .tool{grid-template-columns:48px 1fr}
+  .thumb{width:48px;height:48px;font-size:16px}
+  .side{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;text-align:left}
+  h1{font-size:28px}
+}
+@media (prefers-reduced-motion:no-preference){.toast{animation:up .2s ease-out}@keyframes up{from{opacity:0;translate:0 8px}}}
+</style>
+
+<header class="bar"><div class="wrap">
+  <div class="brand">Tool<span>Swap</span></div>
+  <nav class="tabs" id="tabs"></nav>
+</div></header>
+<div class="wrap"><div class="note">Prototype with example people and tools. Nothing here is real or saved to a server; reload to reset. Today is treated as Wed Nov 25, 2026.</div></div>
+<main class="wrap" id="view"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const TODAY = new Date(2026,10,25);
+const ME = "u0";
+const users = {
+  u0:{name:"You", area:"Elm St"},
+  u1:{name:"Mike Ramirez", area:"0.8 mi · Oak Ridge"},
+  u2:{name:"Sarah Kim", area:"2.1 mi · Westside"},
+  u3:{name:"Pastor Jim Hale", area:"1.4 mi · by the church"},
+  u4:{name:"Tony Bianchi", area:"5.6 mi · Route 9"},
+  u5:{name:"Gina Lowe", area:"3.0 mi · Millbrook"}
+};
+const groups = [
+  {id:"g1", name:"Grace Church Men's Group", members:["u0","u1","u3","u5"], code:"GRACE-4821"},
+  {id:"g2", name:"Valley Hot Rod Club", members:["u0","u1","u2","u4"], code:"HOTROD-1932"},
+  {id:"g3", name:"Iron Riders MC", members:["u0","u2","u4","u5"], code:"IRON-7710"}
+];
+const d = (m,day)=>new Date(2026,m-1,day);
+let tools = [
+  {id:"T-101",owner:"u1",name:"DeWalt 20V cordless drill",cat:"Power tools",value:120,groups:["g1","g2"],tip:"Clutch ring must be on the drill symbol to drill. On numbers it slips on purpose.",link:"https://www.dewalt.com",video:"https://www.youtube.com"},
+  {id:"T-102",owner:"u1",name:"Floor jack, 3 ton",cat:"Automotive",value:180,groups:["g2"],tip:"Turn the release handle fully clockwise before pumping, or it will not lift."},
+  {id:"T-103",owner:"u1",name:"Jack stands (pair)",cat:"Automotive",value:60,groups:["g2"]},
+  {id:"T-104",owner:"u1",name:"Extension ladder, 24 ft",cat:"Ladders",value:250,groups:["g1"]},
+  {id:"T-105",owner:"u1",name:"Torque wrench, 1/2 in",cat:"Hand tools",value:90,groups:["g2"],tip:"Set back to the lowest setting after use. Stored at high tension it loses accuracy."},
+  {id:"T-201",owner:"u2",name:"Engine hoist, 2 ton",cat:"Automotive",value:300,groups:["g2","g3"],deposit:true},
+  {id:"T-202",owner:"u2",name:"Torque wrench, 1/2 in",cat:"Hand tools",value:110,groups:["g2","g3"]},
+  {id:"T-203",owner:"u2",name:"Motorcycle lift table",cat:"Automotive",value:650,groups:["g3"],tip:"Lock bar must click into a notch before you work under load.",video:"https://www.youtube.com"},
+  {id:"T-301",owner:"u3",name:"Pressure washer, 3100 PSI",cat:"Outdoor",value:350,groups:["g1"],tip:"Hold the red primer bulb down 3 seconds before you pull the cord, or it won't start.",video:"https://www.youtube.com"},
+  {id:"T-302",owner:"u3",name:"Folding tables (6)",cat:"Event",value:240,groups:["g1"]},
+  {id:"T-303",owner:"u3",name:"Cordless drill, 18V",cat:"Power tools",value:80,groups:["g1"]},
+  {id:"T-401",owner:"u4",name:"MIG welder, 140A",cat:"Welding",value:520,groups:["g2","g3"],tip:"Uses flux-core wire as loaned. Return with the spool you got."},
+  {id:"T-402",owner:"u4",name:"Floor jack, 2 ton",cat:"Automotive",value:90,groups:["g2","g3"]},
+  {id:"T-403",owner:"u4",name:"Jack stands (pair)",cat:"Automotive",value:45,groups:["g2","g3"]},
+  {id:"T-404",owner:"u4",name:"Compression tester",cat:"Automotive",value:40,groups:["g2"]},
+  {id:"T-501",owner:"u5",name:"Tile saw, wet",cat:"Power tools",value:280,groups:["g1","g3"]},
+  {id:"T-502",owner:"u5",name:"Stud finder",cat:"Hand tools",value:30,groups:["g1"]},
+  {id:"T-001",owner:"u0",name:"Circular saw, 7-1/4 in",cat:"Power tools",value:110,groups:["g1","g2"],tip:"Blade guard sticks a little. Push the lever with your thumb to start the cut."},
+  {id:"T-002",owner:"u0",name:"Socket set, 120 pc",cat:"Hand tools",value:150,groups:["g2","g3"]},
+  {id:"T-003",owner:"u0",name:"Shop vac, 12 gal",cat:"Cleaning",value:90,groups:["g1","g2","g3"]},
+  {id:"T-004",owner:"u0",name:"Hedge trimmer",cat:"Outdoor",value:70,groups:["g1"]},
+  {id:"T-005",owner:"u0",name:"Hand-me-down chainsaw",cat:"Outdoor",value:200,groups:[],tip:"Only lending to people I know well, so it's not in any group yet."}
+];
+// loans: status requested | approved | out | returned | declined
+let loans = [
+  {id:"L1",tool:"T-401",borrower:ME,status:"out",start:d(11,14),due:d(11,28),needBy:null},
+  {id:"L2",tool:"T-301",borrower:ME,status:"out",start:d(11,10),due:d(11,22),needBy:null},
+  {id:"L3",tool:"T-002",borrower:"u4",status:"out",start:d(11,18),due:d(12,2),needBy:d(12,5)},
+  {id:"L4",tool:"T-003",borrower:"u5",status:"requested",start:d(11,27),due:d(11,30),needBy:null,msg:"For cleaning up after Thanksgiving."},
+  {id:"L5",tool:"T-104",borrower:"u2",status:"out",start:d(11,20),due:d(12,4),needBy:null}
+];
+let basket = [];
+let activeGroups = new Set(groups.map(g=>g.id));
+let query = "";
+let reqDates = {};
+
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = dt=>dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+const iso = dt=>dt.toISOString().slice(0,10);
+const days = dt=>Math.round((dt-TODAY)/864e5);
+const tool = id=>tools.find(t=>t.id===id);
+const initials = s=>s.split(/\s+/).filter(w=>/[A-Za-z]/.test(w[0])).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600)}
+const activeLoan = id=>loans.find(l=>l.tool===id&&(l.status==="out"||l.status==="approved"));
+const thumb = t=>`<div class="thumb">${t.photo?`<img src="${t.photo}" alt="">`:esc(initials(t.cat))}</div>`;
+function dueState(l){
+  if(l.status==="returned") return ["Returned","p-neutral"];
+  if(l.status==="requested") return ["Waiting for lender","p-accent"];
+  if(l.status==="approved") return ["Approved, pick up "+fmt(l.start),"p-ok"];
+  if(l.status==="declined") return ["Declined","p-neutral"];
+  const n=days(l.due);
+  if(n<0) return [`Overdue ${-n} day${n===-1?"":"s"}`,"p-bad"];
+  if(n<=3) return [n===0?"Due today":`Due in ${n} day${n===1?"":"s"}`,"p-warn"];
+  return ["Due "+fmt(l.due),"p-ok"];
+}
+
+const VIEWS = ["search","basket","loans","garage","groups"];
+const LABELS = {search:"Find tools",basket:"Basket",loans:"Loans",garage:"My garage",groups:"Groups"};
+function nav(){
+  const v = currentView();
+  const attention = loans.filter(l=>(l.borrower===ME&&l.status==="out"&&days(l.due)<=3)||(tool(l.tool).owner===ME&&l.status==="requested")).length;
+  $("#tabs").innerHTML = VIEWS.map(k=>{
+    let c = k==="basket"&&basket.length?basket.length : k==="loans"&&attention?attention:"";
+    return `<a href="#${k}" class="${v===k?"on":""}">${LABELS[k]}${c?`<span class="count">${c}</span>`:""}</a>`}).join("");
+}
+function currentView(){const h=location.hash.slice(1);return VIEWS.includes(h)?h:"search"}
+function render(){nav();({search:vSearch,basket:vBasket,loans:vLoans,garage:vGarage,groups:vGroups})[currentView()]();}
+addEventListener("hashchange",()=>{render();scrollTo(0,0)});
+
+/* ---------- Find tools ---------- */
+function vSearch(){
+  const mine = groups.filter(g=>g.members.includes(ME));
+  $("#view").innerHTML = `
+    <h1>Find a tool</h1>
+    <p class="lede">You only see tools that friends chose to share with groups you belong to. Add what you need to your basket, and it will show who has the most of it.</p>
+    <div class="row" style="margin-bottom:10px"><input id="q" type="search" placeholder="Search tools, like jack stands or drill" value="${esc(query)}" aria-label="Search tools"></div>
+    <div class="row" style="margin-bottom:16px">${mine.map(g=>`<button class="chip ${activeGroups.has(g.id)?"on":""}" data-g="${g.id}">${esc(g.name)}</button>`).join("")}</div>
+    <div class="list" id="results"></div>`;
+  $("#q").addEventListener("input",e=>{query=e.target.value;results()});
+  document.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const g=b.dataset.g;activeGroups.has(g)?activeGroups.delete(g):activeGroups.add(g);vSearch();$("#q").focus()});
+  results();
+}
+function results(){
+  const q=query.trim().toLowerCase();
+  const list = tools.filter(t=>t.owner!==ME && t.groups.some(g=>activeGroups.has(g)) && (!q || (t.name+" "+t.cat).toLowerCase().includes(q)));
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  $("#results").innerHTML = list.length? list.map(t=>{
+    const loan=activeLoan(t.id), inB=basket.includes(t.id);
+    const shared=t.groups.filter(g=>activeGroups.has(g)).map(g=>groups.find(x=>x.id===g).name);
+    return `<div class="tool">${thumb(t)}
+      <div><div class="tname">${esc(t.name)}</div>
+        <div class="meta"><span>${esc(users[t.owner].name)} · ${esc(users[t.owner].area)}</span><span>via ${esc(shared.join(", "))}</span></div>
+        ${t.tip?`<div class="tip"><b>Good to know:</b> ${esc(t.tip)}</div>`:""}
+        ${t.link||t.video?`<div class="links">${t.link?`<a href="${esc(t.link)}" target="_blank" rel="noopener">Product page</a>`:""}${t.video?`<a href="${esc(t.video)}" target="_blank" rel="noopener">How-to video</a>`:""}</div>`:""}
+      </div>
+      <div class="side">
+        ${t.value?`<span class="money">Value $${t.value}</span>`:""}
+        ${t.deposit?`<span class="pill p-neutral">Deposit later</span>`:""}
+        ${loan?`<span class="pill p-warn">On loan until ${fmt(loan.due)}</span>`:`<span class="pill p-ok">Available</span>`}
+        <button class="small ${inB?"":"primary"}" data-add="${t.id}">${inB?"In basket ✓":"Add to basket"}</button>
+      </div></div>`}).join("") : `<div class="empty">No tools match. Try another word, or turn on more groups above.</div>`;
+  document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.add;
+    if(basket.includes(id)){basket=basket.filter(x=>x!==id);toast("Removed from basket")}
+    else{basket.push(id);toast("Added to basket")}
+    nav();results();
+  });
+}
+
+/* ---------- Basket ---------- */
+function vBasket(){
+  if(!basket.length){$("#view").innerHTML=`<h1>Basket</h1><div class="empty">Your basket is empty. <a href="#search">Find tools</a> and add them here.<br><br>Tip: add <i>every</i> lender's version of a tool you need, like both torque wrenches. The basket then shows which single trip covers the most.</div>`;return}
+  // the names of things you want (dedupe by similar name)
+  const needKey = t=>t.name.toLowerCase().replace(/[^a-z ]/g,"").split(" ").slice(0,2).join(" ");
+  const needs=[...new Set(basket.map(id=>needKey(tool(id))))];
+  const byLender={};
+  basket.forEach(id=>{const t=tool(id);(byLender[t.owner]??=[]).push(t)});
+  const lenders=Object.keys(byLender).sort((a,b)=>new Set(byLender[b].map(needKey)).size-new Set(byLender[a].map(needKey)).size);
+  const bestCount=new Set(byLender[lenders[0]].map(needKey)).size;
+  $("#view").innerHTML=`
+    <h1>Basket</h1>
+    <p class="lede">You're after ${needs.length} kind${needs.length>1?"s":""} of tool. Lenders are sorted by how many of those they can cover, so you can make the fewest trips. Remove the copies you won't need, then send requests.</p>
+    <div class="list">${lenders.map((u,i)=>{
+      const covers=new Set(byLender[u].map(needKey)).size;
+      return `<div class="lender ${i===0&&lenders.length>1&&covers===bestCount?"best":""}">
+        <div class="lender-head"><div><div class="who">${esc(users[u].name)}</div><div class="meta">${esc(users[u].area)}</div>
+          <div class="meter" aria-label="Covers ${covers} of ${needs.length}">${needs.map((_,k)=>`<i class="${k<covers?"f":""}"></i>`).join("")}</div></div>
+          <div class="side">${i===0&&lenders.length>1&&covers===bestCount?`<span class="pill p-accent">Fewest trips</span>`:""}<span class="meta">Covers ${covers} of ${needs.length}</span></div></div>
+        ${byLender[u].map(t=>{const loan=activeLoan(t.id);return `<div class="li"><div><div class="tname" style="font-size:15px">${esc(t.name)}</div>
+          ${loan?`<span class="pill p-warn">On loan until ${fmt(loan.due)}, request for after</span>`:""}</div>
+          <button class="small" data-rm="${t.id}">Remove</button></div>`}).join("")}
+        <div class="li" style="flex-wrap:wrap;background:var(--bg)">
+          <label class="f">Pick up<input type="date" id="pu-${u}" value="${reqDates[u]?.pu||iso(new Date(2026,10,27))}"></label>
+          <label class="f">Return by<input type="date" id="rb-${u}" value="${reqDates[u]?.rb||iso(new Date(2026,11,4))}"></label>
+          <label class="f" style="flex:1;min-width:180px">Note to ${esc(users[u].name.split(" ")[0])}<input type="text" id="msg-${u}" placeholder="What it's for"></label>
+          <button class="primary" data-send="${u}">Send request</button>
+        </div></div>`}).join("")}</div>`;
+  document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{basket=basket.filter(x=>x!==b.dataset.rm);vBasket();nav()});
+  document.querySelectorAll("[data-send]").forEach(b=>b.onclick=()=>{
+    const u=b.dataset.send, pu=$("#pu-"+u).value, rb=$("#rb-"+u).value;
+    if(!pu||!rb||rb<pu){toast("Pick a return date after the pick-up date");return}
+    const [py,pm,pd]=pu.split("-").map(Number),[ry,rm,rd]=rb.split("-").map(Number);
+    byLender[u].forEach(t=>loans.push({id:"L"+Date.now()+t.id,tool:t.id,borrower:ME,status:"requested",start:new Date(py,pm-1,pd),due:new Date(ry,rm-1,rd),msg:$("#msg-"+u).value}));
+    basket=basket.filter(id=>tool(id).owner!==u);
+    toast(`Request sent to ${users[u].name}`);render();
+  });
+}
+
+/* ---------- Loans ---------- */
+function vLoans(){
+  const borrowed=loans.filter(l=>l.borrower===ME&&l.status!=="returned"&&l.status!=="declined");
+  const lent=loans.filter(l=>tool(l.tool).owner===ME&&l.status!=="returned"&&l.status!=="declined");
+  const history=loans.filter(l=>(l.borrower===ME||tool(l.tool).owner===ME)&&(l.status==="returned"||l.status==="declined"));
+  const row=(l,side)=>{const t=tool(l.tool),[lab,cls]=dueState(l);
+    const other = side==="b"?users[t.owner].name:users[l.borrower].name;
+    let actions="";
+    if(side==="b"){
+      if(l.status==="out") actions=`<button class="small" data-ext="${l.id}">Ask for more time</button><button class="small primary" data-ret="${l.id}">I returned it</button>`;
+      if(l.status==="requested") actions=`<button class="small" data-cancel="${l.id}">Cancel request</button>`;
+    } else {
+      if(l.status==="requested") actions=`<button class="small" data-dec="${l.id}">Decline</button><button class="small primary" data-ok="${l.id}">Approve</button>`;
+      if(l.status==="approved") actions=`<button class="small primary" data-picked="${l.id}">Mark picked up</button>`;
+      if(l.status==="out") actions=`<button class="small" data-nudge="${l.id}">Send reminder</button><button class="small primary" data-got="${l.id}">Got it back</button>`;
+    }
+    return `<div class="tool">${thumb(t)}<div><div class="tname">${esc(t.name)}</div>
+      <div class="meta"><span>${side==="b"?"From":"With"} ${esc(other)}</span><span class="card-stamp">${fmt(l.start)} → ${fmt(l.due)}</span></div>
+      ${l.needBy?`<div class="meta"><span class="pill p-neutral">Owner needs it back by ${fmt(l.needBy)}</span></div>`:""}
+      ${l.msg?`<div class="meta">“${esc(l.msg)}”</div>`:""}
+      ${side==="b"&&l.status==="out"&&t.tip?`<div class="tip"><b>Good to know:</b> ${esc(t.tip)}</div>`:""}
+      </div><div class="side"><span class="pill ${cls}">${lab}</span><div class="row" style="justify-content:flex-end">${actions}</div></div></div>`};
+  const rem=[];
+  borrowed.filter(l=>l.status==="out").forEach(l=>{const t=tool(l.tool);
+    rem.push({at:new Date(+l.due-2*864e5),txt:`You: "${t.name}" is due back to ${users[t.owner].name} in 2 days`});
+    rem.push({at:l.due,txt:`You: "${t.name}" is due today`});
+    if(days(l.due)<0) rem.push({at:new Date(+TODAY+864e5),txt:`You: daily overdue reminder for "${t.name}" (and ${users[t.owner].name.split(" ")[0]} is told)`});});
+  lent.filter(l=>l.status==="out").forEach(l=>{const t=tool(l.tool);
+    rem.push({at:new Date(+l.due-2*864e5),txt:`${users[l.borrower].name}: "${t.name}" is due back to you in 2 days`});});
+  const upcoming=rem.filter(r=>days(r.at)>=0).sort((a,b)=>a.at-b.at);
+  $("#view").innerHTML=`
+    <h1>Loans</h1>
+    <p class="lede">Everything you've borrowed and lent, with due dates. Reminders go out automatically, so nobody has to be the bad guy.</p>
+    <h2>Borrowed by you</h2><div class="list">${borrowed.map(l=>row(l,"b")).join("")||`<div class="empty">You're not borrowing anything.</div>`}</div>
+    <h2>Lent out from your garage</h2><div class="list">${lent.map(l=>row(l,"l")).join("")||`<div class="empty">None of your tools are out.</div>`}</div>
+    <h2>Scheduled reminders</h2><div class="panel">${upcoming.map(r=>`<div class="reminder"><span class="when">${fmt(r.at)}</span><span>${esc(r.txt)}</span></div>`).join("")||"Nothing scheduled."}</div>
+    ${history.length?`<h2>History</h2><div class="list">${history.map(l=>{const t=tool(l.tool),[lab,cls]=dueState(l);return `<div class="li panel"><span>${esc(t.name)} <span class="meta" style="display:inline">· ${esc(l.borrower===ME?users[t.owner].name:users[l.borrower].name)}</span></span><span class="pill ${cls}">${lab}</span></div>`}).join("")}</div>`:""}`;
+  const on=(attr,fn)=>document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.onclick=()=>{fn(loans.find(l=>l.id===b.dataset[attr]));render()});
+  on("ret",l=>{l.status="returned";toast(`Marked returned. ${users[tool(l.tool).owner].name.split(" ")[0]} will be asked to confirm.`)});
+  on("ext",l=>{l.due=new Date(+l.due+3*864e5);toast("Asked for 3 more days. Shown here as if the owner approved.")});
+  on("cancel",l=>{loans=loans.filter(x=>x!==l);toast("Request cancelled")});
+  on("ok",l=>{l.status="approved";toast(`Approved. ${users[l.borrower].name.split(" ")[0]} gets your pick-up details.`)});
+  on("dec",l=>{l.status="declined";toast("Declined. They'll get a polite note.")});
+  on("picked",l=>{l.status="out";toast("Marked as picked up. The due-date clock is running.")});
+  on("got",l=>{l.status="returned";toast("Back in your garage.")});
+  on("nudge",l=>toast(`Friendly reminder sent to ${users[l.borrower].name}`));
+}
+
+/* ---------- My garage ---------- */
+function vGarage(){
+  const mine=tools.filter(t=>t.owner===ME);
+  const total=mine.reduce((s,t)=>s+(+t.value||0),0);
+  $("#view").innerHTML=`
+    <h1>My garage</h1>
+    <p class="lede">${mine.length} tools, about $${total.toLocaleString()} in value. Tick a box to share a tool with a group. A tool with no boxes ticked stays private.</p>
+    <div class="matrix"><table><thead><tr><th>Tool</th>${groups.map(g=>`<th class="c">${esc(g.name)}</th>`).join("")}<th>Status</th></tr></thead><tbody>
+    ${mine.map(t=>{const l=activeLoan(t.id),[lab,cls]=l?dueState(l):["In garage","p-neutral"];
+      return `<tr><td><div class="tname" style="font-size:15px">${esc(t.name)}</div><div class="meta"><span class="tagno">${t.id}</span>${t.value?`<span class="money">$${t.value}</span>`:""}</div></td>
+      ${groups.map(g=>`<td class="c"><input type="checkbox" aria-label="Share ${esc(t.name)} with ${esc(g.name)}" data-t="${t.id}" data-gr="${g.id}" ${t.groups.includes(g.id)?"checked":""}></td>`).join("")}
+      <td><span class="pill ${cls}">${l?`Out with ${esc(users[l.borrower].name.split(" ")[0])}`:lab}</span></td></tr>`}).join("")}
+    </tbody></table></div>
+    <h2>Add a tool</h2>
+    <form class="panel form" id="addf">
+      <label class="f full">Tool name<input id="n" type="text" required placeholder="e.g. Ryobi orbital sander"></label>
+      <label class="f">Kind of tool<select id="c">${["Power tools","Hand tools","Automotive","Outdoor","Ladders","Welding","Cleaning","Event","Other"].map(c=>`<option>${c}</option>`).join("")}</select></label>
+      <label class="f">Value in dollars (optional)<input id="v" type="number" min="0" placeholder="80"></label>
+      <label class="f">Photo<input id="p" type="file" accept="image/*"></label>
+      <label class="f">Link to the tool online<input id="lnk" type="url" placeholder="https://"></label>
+      <label class="f">How-to video link<input id="vid" type="url" placeholder="https://"></label>
+      <label class="f full">Good to know (quirks, special steps)<textarea id="tip" placeholder="e.g. Hold the trigger lock down or it won't start."></textarea></label>
+      <div class="full"><div class="f" style="font-weight:600;font-size:13px;color:var(--muted);margin-bottom:6px">Share with</div><div class="row">${groups.map(g=>`<label class="row" style="gap:6px"><input type="checkbox" class="ng" value="${g.id}" checked> ${esc(g.name)}</label>`).join("")}</div></div>
+      <div class="full"><button class="primary" type="submit">Add to my garage</button></div>
+    </form>`;
+  document.querySelectorAll("[data-t]").forEach(cb=>cb.onchange=()=>{const t=tool(cb.dataset.t),g=cb.dataset.gr;
+    t.groups=cb.checked?[...t.groups,g]:t.groups.filter(x=>x!==g);
+    toast(cb.checked?`Now visible to ${groups.find(x=>x.id===g).name}`:`Hidden from ${groups.find(x=>x.id===g).name}`)});
+  $("#addf").onsubmit=e=>{e.preventDefault();
+    const f=$("#p").files[0];
+    const done=photo=>{const n=tools.filter(t=>t.owner===ME).length+1;
+      tools.push({id:"T-"+String(n).padStart(3,"0"),owner:ME,name:$("#n").value.trim(),cat:$("#c").value,value:+$("#v").value||0,photo,link:$("#lnk").value,video:$("#vid").value,tip:$("#tip").value.trim(),groups:[...document.querySelectorAll(".ng:checked")].map(x=>x.value)});
+      toast("Added to your garage");vGarage()};
+    if(f){const r=new FileReader();r.onload=()=>done(r.result);r.readAsDataURL(f)}else done(null)};
+}
+
+/* ---------- Groups ---------- */
+function vGroups(){
+  $("#view").innerHTML=`
+    <h1>Groups</h1>
+    <p class="lede">A group is a circle of people you trust, like your church, car club or riding crew. Members can only see the tools you've shared with that group.</p>
+    <div class="grid2">${groups.map(g=>{const shared=tools.filter(t=>t.owner===ME&&t.groups.includes(g.id)).length;
+      const avail=tools.filter(t=>t.owner!==ME&&t.groups.includes(g.id)).length;
+      return `<div class="panel"><div class="tname">${esc(g.name)}</div>
+        <div class="meta"><span>${g.members.length} members</span><span>${avail} tools from others</span><span>${shared} of yours shared</span></div>
+        <div class="meta" style="margin-top:8px">${g.members.filter(m=>m!==ME).map(m=>esc(users[m].name)).join(", ")}</div>
+        <div class="row" style="margin-top:12px"><span class="tagno" style="font-size:13px;padding:4px 8px">${g.code}</span><button class="small" data-copy="${g.code}">Copy invite code</button></div></div>`}).join("")}
+      <form class="panel" id="newg" style="display:flex;flex-direction:column;gap:10px">
+        <div class="tname">Start a new group</div>
+        <label class="f">Group name<input id="gn" type="text" required placeholder="e.g. Maple Court neighbors"></label>
+        <button class="primary" type="submit">Create group</button>
+        <div class="meta">You get an invite code to text to people. Joining needs your approval.</div>
+      </form></div>`;
+  document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{
+    navigator.clipboard?.writeText(b.dataset.copy).then(()=>toast("Invite code copied"),()=>toast("Copy blocked here. The code is "+b.dataset.copy)) ?? toast("The code is "+b.dataset.copy)});
+  $("#newg").onsubmit=e=>{e.preventDefault();const name=$("#gn").value.trim();
+    groups.push({id:"g"+(groups.length+1),name,members:[ME],code:name.split(/\s+/)[0].toUpperCase().replace(/[^A-Z]/g,"").slice(0,8)+"-"+Math.floor(1000+Math.random()*9000)});
+    activeGroups.add(groups.at(-1).id);toast(`Created ${name}`);vGroups()};
+}
+render();
+</script>

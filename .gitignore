@@ -1,0 +1,5 @@
+app/node_modules
+app/.next
+app/.env
+app/*.tsbuildinfo
+app/next-env.d.ts
